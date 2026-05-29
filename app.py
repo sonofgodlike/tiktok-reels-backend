@@ -12,15 +12,7 @@ def download_tiktok(url, output_path):
         'outtmpl': output_path,
         'format': 'best[ext=mp4]/best',
         'quiet': True,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-            'Referer': 'https://www.tiktok.com/',
-        },
-        'extractor_args': {
-            'tiktok': {
-                'webpage_download': True,
-            }
-        }
+        'impersonate': 'chrome',
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
