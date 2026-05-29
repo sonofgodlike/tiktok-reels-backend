@@ -1,38 +1,29 @@
 from flask import Flask, request, jsonify
 import os
 import uuid
-import requests
+import subprocess
+import sys
 
 app = Flask(__name__)
 DOWNLOAD_DIR = "/tmp/videos"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def download_tiktok(url, output_path):
-    # Use tikwm API to download without watermark
-    api_url = "https://api.tikwm.com/api/"
-    response = requests.post(api_url, data={"url": url, "hd": 1})
-    data = response.json()
-
-    if data.get("code") != 0:
-        raise Exception(f"TikTok API error: {data.get('msg', 'unknown error')}")
-
-    video_url = data["data"].get("hdplay") or data["data"].get("play")
-    title = data["data"].get("title", "TikTok video")
-
-    if not video_url:
-        raise Exception("No video URL found")
-
-    video_response = requests.get(video_url, stream=True, headers={
-        'User-Agent': 'Mozilla/5.0',
-        'Referer': 'https://www.tiktok.com/'
-    })
-    video_response.raise_for_status()
-
-    with open(output_path, 'wb') as f:
-        for chunk in video_response.iter_content(chunk_size=8192):
-            f.write(chunk)
-
-    return title
+    # Use yt-dlp with cookies and no impersonation
+    cmd = [
+        sys.executable, "-m", "yt_dlp",
+        "--no-warnings",
+        "--format", "best[ext=mp4]/best",
+        "--output", output_path,
+        "--add-header", "User-Agent:Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+        "--add-header", "Referer:https://www.tiktok.com/",
+        "--no-check-certificate",
+        url
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(result.stderr or result.stdout)
+    return "TikTok video"
 
 def post_reel(video_path, caption, username, password):
     import shutil
@@ -60,20 +51,28 @@ def post():
     video_path = os.path.join(DOWNLOAD_DIR, f"{uuid.uuid4()}.mp4")
 
     try:
-        title = download_tiktok(link, video_path)
+        download_tiktok(link, video_path)
     except Exception as e:
         return jsonify({"error": f"download failed: {str(e)}"}), 500
 
-    if not os.path.exists(video_path):
+    # find actual downloaded file
+    actual = None
+    for f in os.listdir(DOWNLOAD_DIR):
+        full = os.path.join(DOWNLOAD_DIR, f)
+        if os.path.isfile(full) and f.endswith((".mp4", ".webm", ".mkv")):
+            actual = full
+            break
+
+    if not actual:
         return jsonify({"error": "video file not found after download"}), 500
 
     try:
-        post_reel(video_path, caption or title, username, password)
+        post_reel(actual, caption or "via TikTok", username, password)
     except Exception as e:
         return jsonify({"error": f"upload failed: {str(e)}"}), 500
     finally:
-        if os.path.exists(video_path):
-            os.remove(video_path)
+        if actual and os.path.exists(actual):
+            os.remove(actual)
 
     return jsonify({"success": True, "message": "posted to reels!"})
 
