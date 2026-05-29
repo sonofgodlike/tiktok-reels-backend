@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify
 import yt_dlp
 import os
 import uuid
-import threading
 
 app = Flask(__name__)
 DOWNLOAD_DIR = "/tmp/videos"
@@ -13,7 +12,15 @@ def download_tiktok(url, output_path):
         'outtmpl': output_path,
         'format': 'best[ext=mp4]/best',
         'quiet': True,
-        'http_headers': {'User-Agent': 'Mozilla/5.0'}
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'Referer': 'https://www.tiktok.com/',
+        },
+        'extractor_args': {
+            'tiktok': {
+                'webpage_download': True,
+            }
+        }
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -48,7 +55,7 @@ def post():
     try:
         title = download_tiktok(link, video_base)
     except Exception as e:
-        return jsonify({"error": f"download failed: {e}"}), 500
+        return jsonify({"error": f"download failed: {str(e)}"}), 500
 
     video_path = None
     for f in os.listdir(DOWNLOAD_DIR):
@@ -62,7 +69,7 @@ def post():
     try:
         post_reel(video_path, caption or title, username, password)
     except Exception as e:
-        return jsonify({"error": f"upload failed: {e}"}), 500
+        return jsonify({"error": f"upload failed: {str(e)}"}), 500
     finally:
         if video_path and os.path.exists(video_path):
             os.remove(video_path)
