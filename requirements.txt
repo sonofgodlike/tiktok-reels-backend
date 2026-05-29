@@ -1,5 +1,4 @@
 flask
-yt-dlp
+requests
 instagrapi
 moviepy==2.2.1
-curl_cffi
