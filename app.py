@@ -9,7 +9,6 @@ DOWNLOAD_DIR = "/tmp/videos"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def download_tiktok(url, output_path):
-    # Use yt-dlp with cookies and no impersonation
     cmd = [
         sys.executable, "-m", "yt_dlp",
         "--no-warnings",
@@ -55,7 +54,6 @@ def post():
     except Exception as e:
         return jsonify({"error": f"download failed: {str(e)}"}), 500
 
-    # find actual downloaded file
     actual = None
     for f in os.listdir(DOWNLOAD_DIR):
         full = os.path.join(DOWNLOAD_DIR, f)
@@ -81,4 +79,5 @@ def index():
     return jsonify({"status": "running"})
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
