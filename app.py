@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import os
 import uuid
 import requests
+import time
 
 app = Flask(__name__)
 DOWNLOAD_DIR = "/tmp/videos"
@@ -15,7 +16,7 @@ def download_tiktok(url, output_path):
         "X-RapidAPI-Key": RAPIDAPI_KEY,
         "X-RapidAPI-Host": RAPIDAPI_HOST
     }
-    # Try GET endpoint first
+    time.sleep(1)
     response = requests.get(
         f"https://{RAPIDAPI_HOST}/",
         headers=headers,
@@ -23,16 +24,7 @@ def download_tiktok(url, output_path):
         timeout=30
     )
     data = response.json()
-
-    if data.get("code") != 0:
-        # Try POST endpoint
-        response = requests.post(
-            f"https://{RAPIDAPI_HOST}/",
-            headers=headers,
-            json={"url": url, "hd": "1"},
-            timeout=30
-        )
-        data = response.json()
+    print("API response:", data)
 
     if data.get("code") != 0:
         raise Exception(f"API error: {data.get('msg', str(data))}")
@@ -42,7 +34,7 @@ def download_tiktok(url, output_path):
     title = video_data.get("title", "TikTok video")
 
     if not video_url:
-        raise Exception(f"No video URL found in response: {video_data.keys()}")
+        raise Exception(f"No video URL found. Keys: {list(video_data.keys())}")
 
     video_response = requests.get(video_url, stream=True, timeout=60)
     video_response.raise_for_status()
