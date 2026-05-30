@@ -7,7 +7,7 @@ app = Flask(__name__)
 DOWNLOAD_DIR = "/tmp/videos"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-RAPIDAPI_KEY = "c134bd87a3msh72688b78eebf993p13dcd4jsn1f084c936e8"
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "c134bd87a3msh72688b78eebf993p13dcd4jsn1f084c936e8")
 RAPIDAPI_HOST = "tiktok-video-no-watermark2.p.rapidapi.com"
 
 def download_tiktok(url, output_path):
@@ -15,23 +15,34 @@ def download_tiktok(url, output_path):
         "X-RapidAPI-Key": RAPIDAPI_KEY,
         "X-RapidAPI-Host": RAPIDAPI_HOST
     }
-    params = {"url": url, "hd": "1"}
+    # Try GET endpoint first
     response = requests.get(
         f"https://{RAPIDAPI_HOST}/",
         headers=headers,
-        params=params,
+        params={"url": url, "hd": "1"},
         timeout=30
     )
     data = response.json()
 
     if data.get("code") != 0:
-        raise Exception(f"API error: {data.get('msg', 'unknown')}")
+        # Try POST endpoint
+        response = requests.post(
+            f"https://{RAPIDAPI_HOST}/",
+            headers=headers,
+            json={"url": url, "hd": "1"},
+            timeout=30
+        )
+        data = response.json()
 
-    video_url = data.get("data", {}).get("hdplay") or data.get("data", {}).get("play")
-    title = data.get("data", {}).get("title", "TikTok video")
+    if data.get("code") != 0:
+        raise Exception(f"API error: {data.get('msg', str(data))}")
+
+    video_data = data.get("data", {})
+    video_url = video_data.get("hdplay") or video_data.get("play") or video_data.get("wmplay")
+    title = video_data.get("title", "TikTok video")
 
     if not video_url:
-        raise Exception("No video URL in response")
+        raise Exception(f"No video URL found in response: {video_data.keys()}")
 
     video_response = requests.get(video_url, stream=True, timeout=60)
     video_response.raise_for_status()
