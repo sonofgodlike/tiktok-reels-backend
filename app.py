@@ -1,28 +1,46 @@
 from flask import Flask, request, jsonify
 import os
 import uuid
-import subprocess
-import sys
+import requests
 
 app = Flask(__name__)
 DOWNLOAD_DIR = "/tmp/videos"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+RAPIDAPI_KEY = "c134bd87a3msh72688b78eebf993p13dcd4jsn1f084c936e8"
+RAPIDAPI_HOST = "tiktok-video-no-watermark2.p.rapidapi.com"
+
 def download_tiktok(url, output_path):
-    cmd = [
-        sys.executable, "-m", "yt_dlp",
-        "--no-warnings",
-        "--format", "best[ext=mp4]/best",
-        "--output", output_path,
-        "--add-header", "User-Agent:Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-        "--add-header", "Referer:https://www.tiktok.com/",
-        "--no-check-certificate",
-        url
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(result.stderr or result.stdout)
-    return "TikTok video"
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": RAPIDAPI_HOST
+    }
+    params = {"url": url, "hd": "1"}
+    response = requests.get(
+        f"https://{RAPIDAPI_HOST}/",
+        headers=headers,
+        params=params,
+        timeout=30
+    )
+    data = response.json()
+
+    if data.get("code") != 0:
+        raise Exception(f"API error: {data.get('msg', 'unknown')}")
+
+    video_url = data.get("data", {}).get("hdplay") or data.get("data", {}).get("play")
+    title = data.get("data", {}).get("title", "TikTok video")
+
+    if not video_url:
+        raise Exception("No video URL in response")
+
+    video_response = requests.get(video_url, stream=True, timeout=60)
+    video_response.raise_for_status()
+
+    with open(output_path, 'wb') as f:
+        for chunk in video_response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    return title
 
 def post_reel(video_path, caption, username, password):
     import shutil
@@ -50,27 +68,20 @@ def post():
     video_path = os.path.join(DOWNLOAD_DIR, f"{uuid.uuid4()}.mp4")
 
     try:
-        download_tiktok(link, video_path)
+        title = download_tiktok(link, video_path)
     except Exception as e:
         return jsonify({"error": f"download failed: {str(e)}"}), 500
 
-    actual = None
-    for f in os.listdir(DOWNLOAD_DIR):
-        full = os.path.join(DOWNLOAD_DIR, f)
-        if os.path.isfile(full) and f.endswith((".mp4", ".webm", ".mkv")):
-            actual = full
-            break
-
-    if not actual:
+    if not os.path.exists(video_path):
         return jsonify({"error": "video file not found after download"}), 500
 
     try:
-        post_reel(actual, caption or "via TikTok", username, password)
+        post_reel(video_path, caption or title, username, password)
     except Exception as e:
         return jsonify({"error": f"upload failed: {str(e)}"}), 500
     finally:
-        if actual and os.path.exists(actual):
-            os.remove(actual)
+        if os.path.exists(video_path):
+            os.remove(video_path)
 
     return jsonify({"success": True, "message": "posted to reels!"})
 
