@@ -8,7 +8,7 @@ app = Flask(__name__)
 DOWNLOAD_DIR = "/tmp/videos"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "c134bd87a3msh72688b78eebf993p13dcd4jsn1f084c936e8")
+RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY", "c134bd87a3msh72688b78eebf993p13dcd4jsn1f0846c936e8")
 RAPIDAPI_HOST = "tiktok-video-no-watermark2.p.rapidapi.com"
 
 def download_tiktok(url, output_path):
